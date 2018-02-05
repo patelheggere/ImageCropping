@@ -246,9 +246,8 @@ public class MainActivity extends AppCompatActivity {
                     builder.setNeutralButton("No Filter", new DialogInterface.OnClickListener() {
                         @Override
                         public void onClick(DialogInterface dialogInterface, int i) {
-                            Bitmap photo2 = doColorFilter(photo, 0, 0, 0);
-                            mImageView.setImageBitmap(photo2);
-                            save(photo2, String.valueOf(System.currentTimeMillis()));
+                            mImageView.setImageBitmap(photo);
+                            save(photo, String.valueOf(System.currentTimeMillis()));
                         }
                     });
 
