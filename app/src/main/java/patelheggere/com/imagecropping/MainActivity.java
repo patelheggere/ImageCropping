@@ -16,11 +16,14 @@ import android.provider.MediaStore;
 import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
+import android.widget.GridView;
 import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -33,12 +36,23 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
+import patelheggere.com.imagecropping.activity.ViewImage;
+import patelheggere.com.imagecropping.adapter.GridViewAdapter;
+
 public class MainActivity extends AppCompatActivity {
 
     private Uri mImageUri;
     private ImageView mImageView;
     private AlertDialog dialog;
     private  Bitmap photo;
+
+    // Declare variables
+    private String[] FilePathStrings;
+    private String[] FileNameStrings;
+    private File[] listFile;
+    GridView grid;
+    GridViewAdapter adapter;
+    File file;
 
     private static final int PICK_FROM_CAMERA = 1;
     private static final int CROP_FROM_CAMERA = 2;
@@ -48,6 +62,7 @@ public class MainActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+        loadImages();
         captureImageInitialization();
 
         Button button = findViewById(R.id.SelectImageBtn);
@@ -75,11 +90,12 @@ public class MainActivity extends AppCompatActivity {
             public void onClick(DialogInterface dialog, int item) { // pick from
                 // camera
                 if (item == 0) {
-
+                    file = new File(Environment.getExternalStorageDirectory()
+                            + File.separator + "mybataz");
+                    // Create a new folder if no folder named SDImageTutorial exist
+                    file.mkdirs();
                     Intent intent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
-
-                    mImageUri = Uri.fromFile(new File(Environment
-                            .getExternalStorageDirectory(), "tmp_avatar_"
+                    mImageUri = Uri.fromFile(new File(Environment.getExternalStorageDirectory() + File.separator + "mybataz", "tmp_avatar_"
                             + String.valueOf(System.currentTimeMillis())
                             + ".jpg"));
 
@@ -176,21 +192,22 @@ public class MainActivity extends AppCompatActivity {
                     builder.setPositiveButton("Red", new DialogInterface.OnClickListener() {
                         @Override
                         public void onClick(DialogInterface dialogInterface, int i) {
-                            photo = doColorFilter(photo, 100, 0, 0);
-                            mImageView.setImageBitmap(photo);
+                            Bitmap photo2 = doColorFilter(photo, 30, 0, 0);
+                            mImageView.setImageBitmap(photo2);
+                            save(photo2, String.valueOf(System.currentTimeMillis()));
                         }
                     });
                     builder.setNegativeButton("Blue", new DialogInterface.OnClickListener() {
                         @Override
                         public void onClick(DialogInterface dialogInterface, int i) {
-                            photo = doColorFilter(photo, 0, 0, 100);
-                            mImageView.setImageBitmap(photo);
+                           Bitmap photo2 = doColorFilter(photo, 0, 0, 30);
+                            mImageView.setImageBitmap(photo2);
+                            save(photo2, String.valueOf(System.currentTimeMillis()));
                         }
                     });
 
                     builder.create();
                     builder.show();
-                    //save(photo);
                 }
 
                 File f = new File(mImageUri.getPath());
@@ -203,36 +220,84 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    private void save(Bitmap _bitmapScaled)
+    private void loadImages()
     {
-        ByteArrayOutputStream bytes = new ByteArrayOutputStream();
-        _bitmapScaled.compress(Bitmap.CompressFormat.JPEG, 100, bytes);
-
-        File f = new File(Environment.getExternalStorageDirectory()
-                + File.separator + String.valueOf(System.currentTimeMillis())+".jpg");
-        try {
-            f.createNewFile();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-        FileOutputStream fo = null;
-        try {
-            fo = new FileOutputStream(f);
-        } catch (FileNotFoundException e) {
-            e.printStackTrace();
-        }
-        try {
-            fo.write(bytes.toByteArray());
-        } catch (IOException e) {
-            e.printStackTrace();
+        // Check for SD Card
+        if (!Environment.getExternalStorageState().equals(
+                Environment.MEDIA_MOUNTED)) {
+            Toast.makeText(this, "Error! No SDCARD Found!", Toast.LENGTH_LONG)
+                    .show();
+        } else {
+            // Locate the image folder in your SD Card
+            file = new File(Environment.getExternalStorageDirectory()
+                    + File.separator + "mybataz");
+            // Create a new folder if no folder named SDImageTutorial exist
+            file.mkdirs();
         }
 
-        try {
-            fo.close();
-        } catch (IOException e) {
-            e.printStackTrace();
+        if (file.isDirectory()) {
+            listFile = file.listFiles();
+            // Create a String array for FilePathStrings
+            FilePathStrings = new String[listFile.length];
+            // Create a String array for FileNameStrings
+            FileNameStrings = new String[listFile.length];
+
+            for (int i = 0; i < listFile.length; i++) {
+                // Get the path of the image file
+                FilePathStrings[i] = listFile[i].getAbsolutePath();
+                // Get the name image file
+                FileNameStrings[i] = listFile[i].getName();
+            }
         }
+
+        // Locate the GridView in gridview_main.xml
+        grid = (GridView) findViewById(R.id.gridview);
+        // Pass String arrays to LazyAdapter Class
+        adapter = new GridViewAdapter(this, FilePathStrings, FileNameStrings);
+        // Set the LazyAdapter to the GridView
+        grid.setAdapter(adapter);
+
+        // Capture gridview item click
+        grid.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+
+            @Override
+            public void onItemClick(AdapterView<?> parent, View view,
+                                    int position, long id) {
+
+                Intent i = new Intent(MainActivity.this, ViewImage.class);
+                // Pass String arrays FilePathStrings
+                i.putExtra("filepath", FilePathStrings);
+                // Pass String arrays FileNameStrings
+                i.putExtra("filename", FileNameStrings);
+                // Pass click position
+                i.putExtra("position", position);
+                startActivity(i);
+            }
+
+        });
     }
+
+    private void save(Bitmap finalBitmap, String image_name)
+    {
+
+        String root = Environment.getExternalStorageDirectory().toString()+"/mybataz/";
+        File myDir = new File(root);
+        myDir.mkdirs();
+        String fname = image_name+ ".jpg";
+        File file = new File(myDir, fname);
+        if (file.exists()) file.delete();
+        Log.i("LOAD", root + fname);
+        try {
+            FileOutputStream out = new FileOutputStream(file);
+            finalBitmap.compress(Bitmap.CompressFormat.JPEG, 100, out);
+            out.flush();
+            out.close();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+       loadImages();
+    }
+
 
     private void doCrop() {
         final ArrayList<CropOption> cropOptions = new ArrayList<CropOption>();
