@@ -1,18 +1,22 @@
-package patelheggere.com.imagecropping;
+package patelheggere.com.imagecropping.activity;
 
+import android.Manifest;
 import android.content.ActivityNotFoundException;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 import android.graphics.Bitmap;
-import android.graphics.BlurMaskFilter;
 import android.graphics.Color;
 import android.graphics.drawable.Drawable;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Environment;
 import android.provider.MediaStore;
+import android.support.v4.app.ActivityCompat;
+import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
@@ -28,25 +32,21 @@ import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import java.io.ByteArrayOutputStream;
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
-import patelheggere.com.imagecropping.activity.ViewImage;
+import patelheggere.com.imagecropping.R;
 import patelheggere.com.imagecropping.adapter.GridViewAdapter;
 
 public class MainActivity extends AppCompatActivity {
 
+    private static int PERMISSIONS_MULTIPLE_REQUEST = 123;
     private Uri mImageUri;
     private ImageView mImageView;
     private AlertDialog dialog;
     private  Bitmap photo;
-
-    // Declare variables
     private String[] FilePathStrings;
     private String[] FileNameStrings;
     private File[] listFile;
@@ -62,8 +62,13 @@ public class MainActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-        loadImages();
-        captureImageInitialization();
+        if (Build.VERSION.SDK_INT < 23) {
+            loadImages();
+            captureImageInitialization();
+        } else if(checkRuntimePermissions()) {
+            loadImages();
+            captureImageInitialization();
+            }
 
         Button button = findViewById(R.id.SelectImageBtn);
         mImageView = findViewById(R.id.ProfilePicIV);
@@ -74,6 +79,39 @@ public class MainActivity extends AppCompatActivity {
                 dialog.show();
             }
         });
+
+    }
+
+
+
+    private boolean checkRuntimePermissions()
+    {
+        int permissionCAMERA = ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA);
+
+        int storagePermission = ContextCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE);
+
+        int writePermission = ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE);
+
+
+
+        List<String> listPermissionsNeeded = new ArrayList<>();
+        if (storagePermission != PackageManager.PERMISSION_GRANTED) {
+            listPermissionsNeeded.add(Manifest.permission.READ_EXTERNAL_STORAGE);
+        }
+        if (permissionCAMERA != PackageManager.PERMISSION_GRANTED) {
+            listPermissionsNeeded.add(Manifest.permission.CAMERA);
+        }
+
+        if (writePermission != PackageManager.PERMISSION_GRANTED) {
+            listPermissionsNeeded.add(Manifest.permission.WRITE_EXTERNAL_STORAGE);
+        }
+
+        if (!listPermissionsNeeded.isEmpty()) {
+            ActivityCompat.requestPermissions(this, listPermissionsNeeded.toArray(new String[listPermissionsNeeded.size()]), PERMISSIONS_MULTIPLE_REQUEST);
+            return false;
+        }
+
+        return true;
 
     }
 
@@ -205,6 +243,14 @@ public class MainActivity extends AppCompatActivity {
                             save(photo2, String.valueOf(System.currentTimeMillis()));
                         }
                     });
+                    builder.setNeutralButton("No Filter", new DialogInterface.OnClickListener() {
+                        @Override
+                        public void onClick(DialogInterface dialogInterface, int i) {
+                            Bitmap photo2 = doColorFilter(photo, 0, 0, 0);
+                            mImageView.setImageBitmap(photo2);
+                            save(photo2, String.valueOf(System.currentTimeMillis()));
+                        }
+                    });
 
                     builder.create();
                     builder.show();
@@ -250,14 +296,10 @@ public class MainActivity extends AppCompatActivity {
             }
         }
 
-        // Locate the GridView in gridview_main.xml
-        grid = (GridView) findViewById(R.id.gridview);
-        // Pass String arrays to LazyAdapter Class
+        grid = findViewById(R.id.gridview);
         adapter = new GridViewAdapter(this, FilePathStrings, FileNameStrings);
-        // Set the LazyAdapter to the GridView
         grid.setAdapter(adapter);
 
-        // Capture gridview item click
         grid.setOnItemClickListener(new AdapterView.OnItemClickListener() {
 
             @Override
@@ -265,16 +307,27 @@ public class MainActivity extends AppCompatActivity {
                                     int position, long id) {
 
                 Intent i = new Intent(MainActivity.this, ViewImage.class);
-                // Pass String arrays FilePathStrings
                 i.putExtra("filepath", FilePathStrings);
-                // Pass String arrays FileNameStrings
                 i.putExtra("filename", FileNameStrings);
-                // Pass click position
                 i.putExtra("position", position);
                 startActivity(i);
             }
 
         });
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String permissions[], int[] grantResults) {
+        switch (requestCode) {
+            case 123:
+                if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+
+                    //Permission Granted Successfully. Write working code here.
+                } else {
+                    //You did not accept the request can not use the functionality.
+                }
+                break;
+        }
     }
 
     private void save(Bitmap finalBitmap, String image_name)
